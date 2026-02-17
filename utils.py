@@ -63,3 +63,6 @@ def activate_drawing(hand) -> bool:
             and is_finger_bent(hand, 'thumb'))
 
 
+#Erasing function: all fingers straight except pinky 
+
+
