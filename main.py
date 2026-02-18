@@ -211,7 +211,9 @@ with pyvirtualcam.Camera(width=width, height=height, fps=fps) as cam:
 
                     current_segment = []
 
-            cam.send(frame)
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            cam.send(frame_rgb)
             cam.sleep_until_next_frame()
 
 
