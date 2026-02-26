@@ -52,9 +52,21 @@ def is_finger_bent(hand, finger_name) -> bool:
 
     return angle_1 < 165 or angle_2 < 165
 
+def smooth_point(new_x, new_y, prev_point, alpha=0.4):
+    if prev_point is None:
+        return new_x, new_y
+
+    prev_x, prev_y = prev_point
+
+    smooth_x = int(alpha * new_x + (1 - alpha) * prev_x)
+    smooth_y = int(alpha * new_y + (1 - alpha) * prev_y)
+
+    return smooth_x, smooth_y
+
+
+
 # TODO + index tip higher than others (position)
 # TODO + index far from wrist (distance)
-# TODO + gesture stable for 5 frames
 def activate_drawing(hand) -> bool:
     return (is_finger_straight(hand, 'index')
             and is_finger_bent(hand, 'middle')

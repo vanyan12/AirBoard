@@ -4,7 +4,16 @@ from mediapipe.tasks.python import vision
 import cv2, time
 import numpy as np
 import math
-import utils as u
+import threading
+from utils import *
+import pygame
+
+pygame.mixer.init()
+pygame.mixer.music.load("./assets/uuu.mp3")
+pygame.mixer.music.set_volume(1.0)
+
+def play_sound():
+    pygame.mixer.music.play()
 
 
 
@@ -19,7 +28,14 @@ VisionRunningMode = mp.tasks.vision.RunningMode
 
 drawing_segments = []  # List to store segments of the drawing
 current_segment = []  # List to store the current segment being drawn
-not_drawing_frames = 0  # Counter for frames where drawing is not active
+
+
+STABLE_FRAMES = 5
+MIN_DIST = 5
+
+drawing_stable_counter = 0
+not_drawing_stable_counter = 0
+drawing_active = False
 
 # Create a hand landmarker instance with the live stream mode:
 def print_result(result: HandLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
@@ -79,20 +95,19 @@ def show_connections(frame, hand_landmarks):
 
         cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-def continue_drawing(frame, current_segment):
-    # Draw the saved segments
-    for segment in drawing_segments:
-        for i in range(1, len(segment)):
-            cv2.line(frame,
-                     segment[i - 1],  # first point
-                     segment[i],  # second point
-                     (0, 255, 0), 2)
 
-    for i in range(1, len(current_segment)):
-        cv2.line(frame,
-                 current_segment[i - 1],
-                 current_segment[i],
-                 (0, 255, 0), 2)
+def continue_drawing(frame, current_segment):
+    all_segments = drawing_segments + [current_segment]
+
+    for segment in all_segments:
+        if len(segment) > 1:
+            pts = np.array(segment, dtype=np.int32)
+            cv2.polylines(frame,
+                          [pts],          # must be list of arrays
+                          isClosed=False, # IMPORTANT for drawing strokes
+                          color=(0, 255, 0),
+                          thickness=5,
+                          lineType=cv2.LINE_AA)
 
 
 
@@ -141,25 +156,59 @@ with HandLandmarker.create_from_options(options) as landmarker:
             x_px = int(index_finger_tip.x * w)
             y_px = int(index_finger_tip.y * h)
 
+            is_drawing_gesture = activate_drawing(hand)
 
-            if u.activate_drawing(hand):
-                not_drawing_frames = 0
-                current_segment.append((x_px, y_px))
+            # GESTURE STABILITY LOGIC
 
-                continue_drawing(frame, current_segment)
+            if is_drawing_gesture:
+                drawing_stable_counter += 1
+                not_drawing_stable_counter = 0
             else:
-                not_drawing_frames += 1
-                # When the current segment have points and drawing mode is off, save the segment
-                if current_segment:
+                not_drawing_stable_counter += 1
+                drawing_stable_counter = 0
+
+            # START DRAWING (stable 5 frames)
+            if drawing_stable_counter == STABLE_FRAMES and not drawing_active:
+                drawing_active = True
+
+                threading.Thread(target=play_sound, daemon=True).start()
+
+            # END DRAWING (stable 5 frames)
+            if not_drawing_stable_counter == STABLE_FRAMES:
+                drawing_active = False
+
+                if len(current_segment) > 1:
                     drawing_segments.append(current_segment)
-                    current_segment = []
 
-
-        else:
-            if len(current_segment) > 0:
-                drawing_segments.append(current_segment)
                 current_segment = []
 
+            # ACTUAL DRAWING
+            if drawing_active:
+                if not current_segment:
+                    current_segment.append(smooth_point(x_px, y_px, None))
+                else:
+                    last_x, last_y = current_segment[-1]
+                    distance = math.hypot(x_px - last_x, y_px - last_y)
+
+                    if distance > MIN_DIST:
+                        current_segment.append(smooth_point(x_px, y_px, current_segment[-1]))
+
+
+            continue_drawing(frame, current_segment)
+
+        else:
+            not_drawing_stable_counter += 1
+
+            drawing_stable_counter = 0
+
+            if not_drawing_stable_counter == STABLE_FRAMES:
+
+                drawing_active = False
+
+                if len(current_segment) > 1:
+                    drawing_segments.append(current_segment)
+
+                current_segment = []
 
         cv2.imshow('Hand Landmarker', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
