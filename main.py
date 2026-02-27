@@ -62,7 +62,7 @@ with pyvirtualcam.Camera(width=width, height=height, fps=fps) as cam:
                 y_px = int(index_finger_tip.y * h)
 
                 is_drawing_gesture = activate_drawing(hand)
-                is_color_change_gesture = False #change_color(hand) # TODO: add color change gesture
+                is_color_change_gesture = False #change_color(hand) add color change gesture
                 eraser_active = is_erasing(hand)
 
                 # Color change logic
