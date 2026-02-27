@@ -4,17 +4,8 @@ from mediapipe.tasks.python import vision
 import cv2, time
 import numpy as np
 import math
-import threading
 from utils import *
-import pygame, pyvirtualcam
-
-pygame.mixer.init()
-pygame.mixer.music.load("./assets/uuu.mp3")
-pygame.mixer.music.set_volume(1.0)
-
-def play_sound():
-    pygame.mixer.music.play()
-
+import pyvirtualcam
 
 
 model_path = "./hand_landmarker.task"
