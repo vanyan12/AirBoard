@@ -43,38 +43,6 @@ color = colors[0]
 
 
 
-# Create a hand landmarker instance with the live stream mode:
-def print_result(result: HandLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
-    global index_finger_trajectory
-
-    if result.hand_landmarks:
-        hand = result.hand_landmarks[0]
-
-        index_finger = hand[8]  # Index finger tip is landmark 8
-
-        frame_np = output_image.numpy_view().copy()
-        h, w, _ = frame_np.shape
-
-        x_px = int(index_finger.x * w)
-        y_px = int(index_finger.y * h)
-
-        index_finger_trajectory.append((x_px, y_px))
-
-        for i in range(1, len(index_finger_trajectory)):
-            cv2.line(frame_np, index_finger_trajectory[i-1], index_finger_trajectory[i], (0, 255, 0), 2)
-
-        cv2.imshow('Hand Landmarker', frame_np)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            return
-
-    else:
-        # If no hand is detected, clear the trajectory
-        index_finger_trajectory = []
-        frame_np = output_image.numpy_view().copy()
-        cv2.imshow('Hand Landmarker', frame_np)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            return
-
 def show_connections(frame, hand_landmarks):
 
     h, w, _ = frame.shape
@@ -231,6 +199,7 @@ with HandLandmarker.create_from_options(options) as landmarker:
                 current_segment = []
 
             continue_drawing(frame, current_segment)
+
         x1, y1, x2, y2 = BUTTON_RECT
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, -1)
 
