@@ -1,19 +1,12 @@
+from tkinter.constants import BUTT
+
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import cv2, time
 import numpy as np
 import math
-import threading
 from utils import *
-import pygame
-
-pygame.mixer.init()
-pygame.mixer.music.load("./assets/uuu.mp3")
-pygame.mixer.music.set_volume(1.0)
-
-def play_sound():
-    pygame.mixer.music.play()
 
 
 
@@ -35,7 +28,20 @@ MIN_DIST = 5
 
 drawing_stable_counter = 0
 not_drawing_stable_counter = 0
+erasing_stable_counter = 0
+not_erasing_stable_counter = 0
+
 drawing_active = False
+
+colors = [
+    (255, 0, 0),   # Blue
+    (0, 255, 0),   # Green
+    (0, 0, 255),   # Red
+]
+BUTTON_RECT = (200, 20, 250, 40)
+color = colors[0]
+
+
 
 # Create a hand landmarker instance with the live stream mode:
 def print_result(result: HandLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
@@ -97,17 +103,25 @@ def show_connections(frame, hand_landmarks):
 
 
 def continue_drawing(frame, current_segment):
-    all_segments = drawing_segments + [current_segment]
 
-    for segment in all_segments:
-        if len(segment) > 1:
-            pts = np.array(segment, dtype=np.int32)
+    for segment in drawing_segments:
+        if len(segment['points']) > 1:
+            pts = np.array(segment['points'], dtype=np.int32)
             cv2.polylines(frame,
                           [pts],          # must be list of arrays
                           isClosed=False, # IMPORTANT for drawing strokes
-                          color=(0, 255, 0),
+                          color=segment['color'],
                           thickness=5,
                           lineType=cv2.LINE_AA)
+
+    if len(current_segment) > 1:
+        pts = np.array(current_segment, dtype=np.int32)
+        cv2.polylines(frame,
+                      [pts],          # must be list of arrays
+                      isClosed=False, # IMPORTANT for drawing strokes
+                      color=color,
+                      thickness=5,
+                      lineType=cv2.LINE_AA)
 
 
 
@@ -157,9 +171,13 @@ with HandLandmarker.create_from_options(options) as landmarker:
             y_px = int(index_finger_tip.y * h)
 
             is_drawing_gesture = activate_drawing(hand)
+            is_color_change_gesture = change_color(hand)
 
-            # GESTURE STABILITY LOGIC
+            if is_color_change_gesture:
+                color = colors[(colors.index(color) + 1) % len(colors)]
+                time.sleep(0.5)  # Add a small delay to prevent rapid color changes
 
+            # GESTURE STABILITY LOGIC for drawing
             if is_drawing_gesture:
                 drawing_stable_counter += 1
                 not_drawing_stable_counter = 0
@@ -167,20 +185,22 @@ with HandLandmarker.create_from_options(options) as landmarker:
                 not_drawing_stable_counter += 1
                 drawing_stable_counter = 0
 
+
             # START DRAWING (stable 5 frames)
             if drawing_stable_counter == STABLE_FRAMES and not drawing_active:
                 drawing_active = True
-
-                threading.Thread(target=play_sound, daemon=True).start()
 
             # END DRAWING (stable 5 frames)
             if not_drawing_stable_counter == STABLE_FRAMES:
                 drawing_active = False
 
+
                 if len(current_segment) > 1:
-                    drawing_segments.append(current_segment)
+                    drawing_segments.append({"points": current_segment, "color": color})
 
                 current_segment = []
+
+
 
             # ACTUAL DRAWING
             if drawing_active:
@@ -206,9 +226,13 @@ with HandLandmarker.create_from_options(options) as landmarker:
                 drawing_active = False
 
                 if len(current_segment) > 1:
-                    drawing_segments.append(current_segment)
+                    drawing_segments.append({"points": current_segment, "color": color})
 
                 current_segment = []
+
+            continue_drawing(frame, current_segment)
+        x1, y1, x2, y2 = BUTTON_RECT
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, -1)
 
         cv2.imshow('Hand Landmarker', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -216,8 +240,4 @@ with HandLandmarker.create_from_options(options) as landmarker:
 
 cap.release()
 cv2.destroyAllWindows()
-
-
-
-
 
