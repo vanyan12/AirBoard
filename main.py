@@ -135,7 +135,7 @@ options = HandLandmarkerOptions(
 )
 
 # Open webcam
-cap = cv2.VideoCapture(1) # change 0 to 1 if you have multiple cameras and want to use the second one
+cap = cv2.VideoCapture(0) # change 0 to 1 if you have multiple cameras and want to use the second one
 
 # Set camera resolution (change 640, 480 to your desired width and height)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
