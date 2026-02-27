@@ -221,28 +221,6 @@ def erase_segments(segments, eraser_pos, radius=ERASER_RADIUS):
         )
     ]
 
-def draw_toolpad(img, pen_color, pen_size):
-    """Draw UI ONLY for local preview."""
-    overlay = img.copy()
 
-    # panel
-    cv2.rectangle(overlay, (20, 20), (260, 170), (0, 0, 0), -1)
-    cv2.rectangle(overlay, (20, 20), (260, 170), (255, 255, 255), 2)
-
-    cv2.putText(overlay, "AirBoard Toolpad", (30, 55),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
-
-    # color preview
-    cv2.putText(overlay, "Color:", (30, 90),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200,200,200), 2)
-    cv2.rectangle(overlay, (120, 75), (240, 100), pen_color, -1)
-    cv2.rectangle(overlay, (120, 75), (240, 100), (255,255,255), 1)
-
-    # size preview
-    cv2.putText(overlay, f"Size: {pen_size}", (30, 135),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200,200,200), 2)
-    cv2.circle(overlay, (200, 130), pen_size, (255,255,255), -1)
-
-    cv2.imshow("AirBoard (local preview)", overlay)
 
 

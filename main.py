@@ -52,7 +52,6 @@ with pyvirtualcam.Camera(width=width, height=height, fps=fps) as cam:
             # Draw on frame
             if result.hand_landmarks:
                 show_connections(frame, result.hand_landmarks[0])
-                draw_toolpad(frame, PEN_COLOR, PEN_SIZE)
 
                 hand = result.hand_landmarks[0]
                 index_finger_tip = hand[8]
