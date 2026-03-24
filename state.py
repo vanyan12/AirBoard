@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple
 
 
 class Mode(Enum):
@@ -8,20 +8,28 @@ class Mode(Enum):
     DRAWING = auto()
     ERASING = auto()
 
-Point = Tuple[int, int]
-Segment = Dict[str, Any]  # {"points": List[Point], "color":
+
+Point = Tuple[float, float]
 Color = Tuple[int, int, int]  # (B, G, R)
+
+
+@dataclass
+class Segment:
+    points: List[Point]
+    color: Color
+    size: int
+
 
 @dataclass
 class DrawingState:
-    drawing_segments: List[Dict[str, Any]] = field(default_factory=list)
+    drawing_segments: List[Segment] = field(default_factory=list)
     current_segment: List[Point] = field(default_factory=list)
 
     mode: Mode = Mode.IDLE
     drawing_stable_counter: int = 0
     not_drawing_stable_counter: int = 0
 
-    pen_color: Color = (0, 0, 255)  # Red
+    pen_color: Color = (0, 0, 255)
     pen_size: int = 5
     eraser_radius: int = 20
 
@@ -35,12 +43,13 @@ class DrawingState:
 
     def end_stroke(self) -> None:
         if len(self.current_segment) > 1:
-            # Store a copy so future point appends/clears cannot mutate saved strokes.
-            self.drawing_segments.append({
-                "points": self.current_segment.copy(),
-                "color": self.pen_color,
-                "size": self.pen_size
-            })
+            self.drawing_segments.append(
+                Segment(
+                    points=self.current_segment.copy(),
+                    color=self.pen_color,
+                    size=self.pen_size,
+                )
+            )
         self.current_segment.clear()
 
     def commit_if_drawing(self) -> None:
@@ -56,7 +65,6 @@ class DrawingState:
         self.drawing_segments.clear()
         self.current_segment.clear()
 
-
-    def reset_stability_counters(self):
+    def reset_stability_counters(self) -> None:
         self.drawing_stable_counter = 0
         self.not_drawing_stable_counter = 0
