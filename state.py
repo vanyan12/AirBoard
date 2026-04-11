@@ -12,6 +12,9 @@ class Mode(Enum):
 Point = Tuple[float, float]
 Color = Tuple[int, int, int]  # (B, G, R)
 
+MIN_PEN_SIZE = 5
+MAX_PEN_SIZE = 25
+
 
 @dataclass
 class Segment:
@@ -32,6 +35,16 @@ class DrawingState:
     pen_color: Color = (0, 0, 255)
     pen_size: int = 5
     eraser_radius: int = 20
+
+    def __post_init__(self) -> None:
+        self.pen_size = self.clamp_pen_size(self.pen_size)
+
+    @staticmethod
+    def clamp_pen_size(value: int) -> int:
+        return max(MIN_PEN_SIZE, min(MAX_PEN_SIZE, value))
+
+    def set_pen_size(self, value: int) -> None:
+        self.pen_size = self.clamp_pen_size(value)
 
     def start_stroke(self) -> None:
         if not self.current_segment:

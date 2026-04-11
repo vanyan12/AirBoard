@@ -1,15 +1,9 @@
-import math
-
 import cv2
 import numpy as np
 
 from config import DEFAULT_ERASER_RADIUS
 from state import Point, Segment
 
-# mcp - 0
-# pip - 1
-# dip - 2
-# tip - 3
 fingers = {
     "thumb": [1, 2, 3, 4],
     "index": [5, 6, 7, 8],
@@ -19,12 +13,26 @@ fingers = {
     "wrist": [0],
 }
 
+JOINT_INDEX = {
+    "mcp": 0,
+    "pip": 1,
+    "dip": 2,
+    "tip": 3,
+}
+
+
+def get_finger_joint(hand, finger_name: str, joint_name: str) -> np.ndarray:
+    """
+    Return a finger joint coordinate as np.array([x, y, z], dtype=np.float32).
+
+    finger_name: "thumb" | "index" | "middle" | "ring" | "pinky"
+    joint_name:  "mcp" | "pip" | "dip" | "tip"
+    """
+    joint_idx = fingers[finger_name][JOINT_INDEX[joint_name]]
+    return np.array([hand[joint_idx].x, hand[joint_idx].y, hand[joint_idx].z], dtype=np.float32)
+
 
 def angle(j1, j2, j3):
-    # j1 = np.array([j1.x, j1.y, j1.z])
-    # j2 = np.array([j2.x, j2.y, j2.z])
-    # j3 = np.array([j3.x, j3.y, j3.z])
-
     v1 = j1 - j2
     v2 = j3 - j2
     cos_ang = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
@@ -39,27 +47,33 @@ def distance(p1, p2):
 
 
 def is_finger_straight(hand, finger_name, thr=170) -> bool:
-    mcp = np.array([hand[fingers[finger_name][0]].x, hand[fingers[finger_name][0]].y, hand[fingers[finger_name][0]].z])
-    pip = np.array([hand[fingers[finger_name][1]].x, hand[fingers[finger_name][1]].y, hand[fingers[finger_name][1]].z])
-    dip = np.array([hand[fingers[finger_name][2]].x, hand[fingers[finger_name][2]].y, hand[fingers[finger_name][2]].z])
-    tip = np.array([hand[fingers[finger_name][3]].x, hand[fingers[finger_name][3]].y, hand[fingers[finger_name][3]].z])
+    mcp = get_finger_joint(hand, finger_name, "mcp")
+    pip = get_finger_joint(hand, finger_name, "pip")
+    dip = get_finger_joint(hand, finger_name, "dip")
+    tip = get_finger_joint(hand, finger_name, "tip")
 
     return angle(mcp, pip, dip) > thr and angle(pip, dip, tip) > thr
 
-def is_finger_extended(hand, finger_name, thr=170) -> bool:
-    pip = np.array([hand[fingers[finger_name][1]].x, hand[fingers[finger_name][1]].y, hand[fingers[finger_name][1]].z])
-    tip = np.array([hand[fingers[finger_name][3]].x, hand[fingers[finger_name][3]].y, hand[fingers[finger_name][3]].z])
 
-    return tip[1] < pip[1]
+def is_finger_extended(hand, finger_name, thr=150) -> bool:
+    mcp = get_finger_joint(hand, finger_name, "mcp")
+    pip = get_finger_joint(hand, finger_name, "pip")
+    dip = get_finger_joint(hand, finger_name, "dip")
+    tip = get_finger_joint(hand, finger_name, "tip")
 
-def is_finger_bent(hand, finger_name, thr=165) -> bool:
+    return angle(mcp, pip, dip) > thr and angle(pip, dip, tip) > thr
 
-    mcp = np.array([hand[fingers[finger_name][0]].x, hand[fingers[finger_name][0]].y, hand[fingers[finger_name][0]].z])
-    pip = np.array([hand[fingers[finger_name][1]].x, hand[fingers[finger_name][1]].y, hand[fingers[finger_name][1]].z])
-    dip = np.array([hand[fingers[finger_name][2]].x, hand[fingers[finger_name][2]].y, hand[fingers[finger_name][2]].z])
-    tip = np.array([hand[fingers[finger_name][3]].x, hand[fingers[finger_name][3]].y, hand[fingers[finger_name][3]].z])
 
-    return angle(mcp, pip, dip) < thr or angle(pip, dip, tip) < thr
+def is_finger_bent(hand, finger_name, thr=160) -> bool:
+    mcp = get_finger_joint(hand, finger_name, "mcp")
+    pip = get_finger_joint(hand, finger_name, "pip")
+    dip = get_finger_joint(hand, finger_name, "dip")
+    tip = get_finger_joint(hand, finger_name, "tip")
+
+    if finger_name == "thumb":
+        return angle(mcp, pip, dip) < 180 and angle(pip, dip, tip) < thr
+
+    return angle(mcp, pip, dip) < thr and angle(pip, dip, tip) < thr
 
 
 def smooth_point(new_x, new_y, prev_point, alpha=0.4) -> Point:
@@ -86,16 +100,24 @@ def is_index_highest(hand) -> bool:
     ring_y = hand[16].y
     pinky_y = hand[20].y
 
-    return (middle_y - index_y) >= 0.03 and (ring_y - index_y) >= 0.03 and (pinky_y - index_y) >= 0.03
+    return (middle_y - index_y) >= 0.02 and (ring_y - index_y) >= 0.02 and (pinky_y - index_y) >= 0.02
+
+
+def is_thumb_near_index(hand, thr=0.25) -> bool:
+    thumb_dip = get_finger_joint(hand, "thumb", "dip")
+    index_mcp = get_finger_joint(hand, "index", "mcp")
+
+    print(distance(thumb_dip, index_mcp))
+    return distance(thumb_dip, index_mcp) < thr
 
 
 def are_pips_in_line(hand) -> bool:
     fingers_to_check = ["index", "middle", "ring", "pinky"]
     for finger_name in fingers_to_check:
-        mcp = np.array([hand[fingers[finger_name][0]].x, hand[fingers[finger_name][0]].y, hand[fingers[finger_name][0]].z])
-        pip = np.array([hand[fingers[finger_name][1]].x, hand[fingers[finger_name][1]].y, hand[fingers[finger_name][1]].z])
-        dip = np.array([hand[fingers[finger_name][2]].x, hand[fingers[finger_name][2]].y, hand[fingers[finger_name][2]].z])
-        tip = np.array([hand[fingers[finger_name][3]].x, hand[fingers[finger_name][3]].y, hand[fingers[finger_name][3]].z])
+        mcp = get_finger_joint(hand, finger_name, "mcp")
+        pip = get_finger_joint(hand, finger_name, "pip")
+        dip = get_finger_joint(hand, finger_name, "dip")
+        tip = get_finger_joint(hand, finger_name, "tip")
 
         if angle(mcp, pip, dip) > 95 or angle(pip, dip, tip) > 95:
             return False
@@ -121,30 +143,38 @@ def are_pips_in_line(hand) -> bool:
 
 def change_color(hand) -> bool:
     return (
-        is_finger_bent(hand, "index")
+        is_finger_bent(hand, "index", thr=130)
         and is_finger_bent(hand, "middle")
         and is_finger_bent(hand, "ring")
         and is_finger_bent(hand, "pinky")
-        and is_finger_bent(hand, "thumb")
+        # and is_finger_bent(hand, "thumb")
     )
 
+def size_change(hand) -> bool:
+    return (
+        
+    )
 
-# TODO + index tip higher than others (position)
-# TODO + index far from wrist (distance)
 def activate_drawing(hand) -> bool:
     return (
         is_finger_extended(hand, "index")
-        and
-        is_index_highest(hand)
-        and is_finger_bent(hand, "middle")
-        and is_finger_bent(hand, "ring")
-        and is_finger_bent(hand, "pinky")
-        and is_finger_bent(hand, "thumb")
+        and is_index_highest(hand)
+        # and not is_finger_extended(hand, "middle")
+        # and not is_finger_extended(hand, "ring")
+        # and not is_finger_extended(hand, "pinky")
+        # and not is_finger_extended(hand, "thumb")
+    )
+
+
+def change_pen_color(hand) -> bool:
+    return (
+        activate_drawing(hand)
+        and is_finger_straight(hand, "thumb")
+        and is_thumb_near_index(hand, thr=0.3)
     )
 
 
 def show_connections(frame, hand_landmarks):
-
     h, w, _ = frame.shape
     for landmark in hand_landmarks:
         x_px = int(landmark.x * w)
@@ -196,14 +226,31 @@ def draw_segments(frame, drawing_segments: list[Segment], current_segment: list[
         )
 
 
+def are_fingertips_clustered(hand, thr=0.25) -> bool:
+    """Return True when all fingertips are close to each other."""
+    tip_ids = [4, 8, 12, 16, 20]
+    tips = [
+        np.array([hand[i].x, hand[i].y, hand[i].z], dtype=np.float32)
+        for i in tip_ids
+    ]
+
+    # All pairwise fingertip distances must be under the threshold.
+    for i in range(len(tips)):
+        for j in range(i + 1, len(tips)):
+            if np.linalg.norm(tips[i] - tips[j]) > thr:
+                return False
+
+    return True
+
+
 def is_erasing(hand) -> bool:
     return (
-        is_finger_bent(hand, "index", thr=150)
-        and is_finger_bent(hand, "middle", thr=150)
-        and is_finger_bent(hand, "ring", thr=150)
-        and is_finger_bent(hand, "pinky", thr=150)
-        and is_finger_bent(hand, "thumb", thr=160)
-        # and are_pips_in_line(hand)
+            is_finger_extended(hand, "index", thr=150)
+            and is_finger_extended(hand, "middle", thr=150)
+            and is_finger_extended(hand, "ring", thr=150)
+            and is_finger_extended(hand, "pinky", thr=150)
+            and is_finger_straight(hand, "thumb", thr=160)
+            and are_fingertips_clustered(hand, thr=0.18)
     )
 
 # def erase_brush(segments, x, y, radius=5):
@@ -242,7 +289,7 @@ def is_erasing(hand) -> bool:
 
 def eraser_center(hand, frame_width, frame_height):
     # Average of all finger tips (thumb + index + middle + ring + pinky)
-    points = [hand[4], hand[8], hand[12], hand[16], hand[20]]
+    points = [hand[5], hand[9], hand[13], hand[17], hand[0]]
     x = int(sum(p.x for p in points) / len(points) * frame_width)
     y = int(sum(p.y for p in points) / len(points) * frame_height)
     return x, y
@@ -257,4 +304,3 @@ def erase_segments(segments: list[Segment], eraser_pos, radius=DEFAULT_ERASER_RA
         for seg in segments
         if not any((px - ex) ** 2 + (py - ey) ** 2 <= radius_sq for px, py in seg.points)
     ]
-

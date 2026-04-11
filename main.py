@@ -15,10 +15,13 @@ from config import (
     MODEL_PATH,
     STABLE_FRAMES,
     VisionRunningMode,
+    COLORS,
 )
 from state import DrawingState, Mode
 from utils import (
     activate_drawing,
+    change_pen_color,
+    change_color,
     draw_segments,
     erase_segments,
     eraser_center,
@@ -79,6 +82,7 @@ def process_hand(state: DrawingState, hand, frame) -> None:
 
     is_drawing_gesture = activate_drawing(hand)
     eraser_active = is_erasing(hand)
+    color_change = change_color(hand)
 
     update_stability_counters(state, is_drawing_gesture)
 
@@ -90,6 +94,28 @@ def process_hand(state: DrawingState, hand, frame) -> None:
 
         update_mode_from_gesture(state)
         apply_drawing_point(state, x_px, y_px)
+
+    if color_change:
+        state.pen_color = COLORS[(COLORS.index(state.pen_color) + 1) % len(COLORS)]
+        time.sleep(0.5)  # debounce color change
+
+
+def draw_toolbar(frame, state: DrawingState) -> None:
+    h, w, _ = frame.shape
+    toolbar_height = max(60, int(h * 0.1))
+
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (0, 0), (w, toolbar_height), (30, 30, 30), -1)
+    cv2.addWeighted(overlay, 0.65, frame, 0.35, 0, frame)
+
+    cv2.putText(frame, "Color", (16, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (245, 245, 245), 2, cv2.LINE_AA)
+    cv2.rectangle(frame, (90, 10), (150, 42), state.pen_color, -1)
+    cv2.rectangle(frame, (90, 10), (150, 42), (245, 245, 245), 2)
+
+    cv2.putText(frame, "Size", (175, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (245, 245, 245), 2, cv2.LINE_AA)
+    cv2.putText(frame, str(state.pen_size), (240, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (245, 245, 245), 2, cv2.LINE_AA)
+    cv2.circle(frame, (300, 26), max(2, state.pen_size), state.pen_color, -1)
+
 
 
 def main() -> None:
@@ -135,6 +161,7 @@ def main() -> None:
                 state.pen_color,
                 state.pen_size,
             )
+            draw_toolbar(frame, state)
 
             cv2.imshow("Virtual Drawing", frame)
             if (cv2.waitKey(1) & 0xFF) == ord("q"):
